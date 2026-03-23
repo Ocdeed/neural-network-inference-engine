@@ -4,11 +4,6 @@ build/
 *.so
 *.a
 
-# Binaries
-nn_engine
-tests/test_*
-tests/benchmark_*
-
 # OS
 .DS_Store
 Thumbs.db
@@ -17,7 +12,3 @@ Thumbs.db
 gmon.out
 perf.data*
 callgrind.out.*
-
-# Models
-*.nnbin
-*.gguf

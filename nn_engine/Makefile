@@ -12,7 +12,7 @@ TARGET = nn_engine
 SRCDIR = src
 BUILDDIR = build
 
-SOURCES = $(wildcard $(SRCDIR)/*.c)
+SOURCES = $(filter-out $(SRCDIR)/profiling_guide.c, $(wildcard $(SRCDIR)/*.c))
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(BUILDDIR)/%.o)
 HEADERS = $(wildcard $(SRCDIR)/*.h)
 
