@@ -1,148 +1,310 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digit Recognizer - Pure C Neural Network</title>
+    <title>Digit Recognizer</title>
     <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --border: #2a2a2a;
+            --text: #e0e0e0;
+            --text-dim: #666;
+            --accent: #fff;
+            --accent-dim: #333;
+        }
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: sans-serif; background: #111; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; color: #fff; }
-        h1 { font-size: 2rem; margin-bottom: 5px; }
-        .subtitle { color: #888; margin-bottom: 20px; }
-        .container { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
-        .canvas-container { border: 3px solid #0ff; border-radius: 10px; }
-        canvas { display: block; background: #000; cursor: crosshair; }
-        .buttons { display: flex; gap: 10px; margin-top: 15px; }
-        button { padding: 12px 24px; font-size: 1rem; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn-predict { background: #0ff; color: #000; }
-        .btn-clear { background: #333; color: #fff; }
-        .result-area { min-width: 300px; }
-        .prediction { font-size: 4rem; font-weight: bold; color: #0ff; }
-        .confidence-bar { background: #222; border-radius: 10px; padding: 15px; margin-top: 20px; }
-        .confidence-item { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
-        .digit { width: 25px; font-weight: bold; }
-        .bar-container { flex: 1; height: 18px; background: #333; border-radius: 3px; }
-        .bar { height: 100%; background: #0ff; }
-        .percentage { width: 50px; text-align: right; color: #888; font-size: 0.85rem; }
-        .badge { background: #0ff; color: #000; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px; }
-        .loading { color: #888; font-style: italic; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        
+        .container {
+            display: flex;
+            gap: 48px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+        
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 0.875rem;
+            margin-bottom: 32px;
+        }
+        
+        .canvas-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+        }
+        
+        canvas {
+            display: block;
+            background: #000;
+            border-radius: 4px;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 10px 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        button:hover {
+            background: var(--accent-dim);
+        }
+        
+        button.primary {
+            background: var(--text);
+            color: var(--bg);
+            border-color: var(--text);
+        }
+        
+        button.primary:hover {
+            background: #ccc;
+        }
+        
+        .result {
+            min-width: 240px;
+        }
+        
+        .result-label {
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        
+        .prediction {
+            font-size: 5rem;
+            font-weight: 300;
+            line-height: 1;
+            margin-bottom: 24px;
+            color: var(--accent);
+            min-height: 80px;
+        }
+        
+        .bars {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .bar-digit {
+            width: 16px;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+        
+        .bar-track {
+            flex: 1;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .bar-fill {
+            height: 100%;
+            background: var(--text);
+            border-radius: 2px;
+            transition: width 0.2s ease;
+        }
+        
+        .bar-pct {
+            width: 40px;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            text-align: right;
+        }
+        
+        .loading {
+            color: var(--text-dim);
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 <body>
-    <h1>Digit Recognizer <span class="badge">Pure C + WASM</span></h1>
-    <p class="subtitle">Draw 0-9 • Neural Network in WebAssembly</p>
+    <h1>Digit Recognizer</h1>
+    <p class="subtitle">Pure C Neural Network in WebAssembly</p>
     
     <div class="container">
         <div>
-            <div class="canvas-container">
-                <canvas id="c" width="280" height="280"></canvas>
+            <div class="canvas-wrap">
+                <canvas id="c" width="240" height="240"></canvas>
             </div>
-            <div class="buttons">
-                <button class="btn-clear" onclick="clr()">Clear</button>
-                <button class="btn-predict" onclick="pred()">Predict</button>
+            <div class="actions">
+                <button onclick="clr()">Clear</button>
+                <button class="primary" onclick="pred()">Predict</button>
             </div>
         </div>
         
-        <div class="result-area">
-            <p style="color:#888">Prediction:</p>
-            <div class="prediction" id="pred">-</div>
-            <div class="confidence-bar" id="conf"></div>
+        <div class="result">
+            <div class="result-label">Prediction</div>
+            <div class="prediction" id="pred">
+                <span class="loading" id="loading">Loading...</span>
+            </div>
+            <div class="bars" id="bars"></div>
         </div>
     </div>
 
     <script src="nn.js"></script>
     <script>
-    var cvs = document.getElementById('c');
-    var ctx = cvs.getContext('2d');
-    var drawing = false;
-    var nnReady = false;
+    const cvs = document.getElementById('c');
+    const ctx = cvs.getContext('2d');
+    let drawing = false;
+    let nnReady = false;
 
     ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, 280, 280);
+    ctx.fillRect(0, 0, 240, 240);
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 20;
+    ctx.lineWidth = 18;
     ctx.lineCap = 'round';
 
-    cvs.onmousedown = function(e) { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); };
-    cvs.onmousemove = function(e) { if(drawing){ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke();} };
-    cvs.onmouseup = function(){ drawing = false; };
-    cvs.onmouseout = function(){ drawing = false; };
+    function getPos(e) {
+        const r = cvs.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+        return { x, y };
+    }
 
-    cvs.ontouchstart = function(e){ e.preventDefault(); drawing=true; var t=e.touches[0]; var r=cvs.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo(t.clientX-r.left, t.clientY-r.top); };
-    cvs.ontouchmove = function(e){ e.preventDefault(); if(drawing){var t=e.touches[0];var r=cvs.getBoundingClientRect();ctx.lineTo(t.clientX-r.left,t.clientY-r.top);ctx.stroke();} };
-    cvs.ontouchend = function(){ drawing = false; };
+    cvs.addEventListener('mousedown', e => { 
+        drawing = true; 
+        const p = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+    });
+    
+    cvs.addEventListener('mousemove', e => {
+        if (!drawing) return;
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+    });
+    
+    cvs.addEventListener('mouseup', () => drawing = false);
+    cvs.addEventListener('mouseleave', () => drawing = false);
+
+    cvs.addEventListener('touchstart', e => {
+        e.preventDefault();
+        drawing = true;
+        const p = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+    });
+    
+    cvs.addEventListener('touchmove', e => {
+        e.preventDefault();
+        if (!drawing) return;
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+    });
+    
+    cvs.addEventListener('touchend', () => drawing = false);
 
     function clr() {
         ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, 280, 280);
-        document.getElementById('pred').innerHTML = '-';
-        document.getElementById('conf').innerHTML = '';
+        ctx.fillRect(0, 0, 240, 240);
+        document.getElementById('pred').innerHTML = '<span class="loading">Ready</span>';
+        document.getElementById('bars').innerHTML = '';
     }
 
-    var nn_predict, nn_get_probs;
+    let nn_predict, nn_get_probs;
 
-    function initNN() {
-        if (typeof Module === 'undefined') {
-            document.getElementById('pred').innerHTML = '<span class="loading">Loading C module...</span>';
-            setTimeout(initNN, 100);
-            return;
-        }
-        
-        Module.onRuntimeInitialized = function() {
-            nn_predict = Module.cwrap('nn_predict', 'number', ['array']);
-            nn_get_probs = Module.cwrap('nn_get_probs', null, ['array', 'array']);
-            nnReady = true;
-            document.getElementById('pred').innerHTML = 'Ready!';
-            setTimeout(function() { 
-                if(document.getElementById('pred').innerHTML === 'Ready!')
-                    document.getElementById('pred').innerHTML = '-'; 
-            }, 1000);
-        };
-    }
-
-    initNN();
+    Module.onRuntimeInitialized = function() {
+        nn_predict = Module.cwrap('nn_predict', 'number', ['array']);
+        nn_get_probs = Module.cwrap('nn_get_probs', null, ['array', 'array']);
+        nnReady = true;
+        document.getElementById('pred').innerHTML = '<span class="loading">Ready</span>';
+    };
 
     function pred() {
         if (!nnReady) {
-            alert('Neural network loading... please wait');
+            alert('Loading... please wait');
             return;
         }
 
-        var tmp = document.createElement('canvas');
-        tmp.width = 28; tmp.height = 28;
-        var tctx = tmp.getContext('2d');
+        const tmp = document.createElement('canvas');
+        tmp.width = 28;
+        tmp.height = 28;
+        const tctx = tmp.getContext('2d');
         tctx.drawImage(cvs, 0, 0, 28, 28);
-        var d = tctx.getImageData(0, 0, 28, 28).data;
+        const d = tctx.getImageData(0, 0, 28, 28).data;
         
-        var input = new Float32Array(784);
-        for (var i = 0; i < 784; i++) {
-            var idx = i * 4;
-            input[i] = (255 - (d[idx] + d[idx+1] + d[idx+2]) / 3) / 255.0;
+        const input = new Float32Array(784);
+        for (let i = 0; i < 784; i++) {
+            const idx = i * 4;
+            input[i] = (255 - (d[idx] + d[idx + 1] + d[idx + 2]) / 3) / 255.0;
         }
         
-        var sum = 0;
-        for(var i = 0; i < 784; i++) sum += input[i];
+        let sum = 0;
+        for (let i = 0; i < 784; i++) sum += input[i];
         
-        if(sum < 20) {
-            alert('Draw a digit!');
+        if (sum < 20) {
+            alert('Draw a digit first');
             return;
         }
 
-        var probs = new Float32Array(10);
+        const probs = new Float32Array(10);
         nn_get_probs(input, probs);
 
-        var max = 0, p = 0;
-        for(var i = 0; i < 10; i++) {
-            if(probs[i] > max) { max = probs[i]; p = i; }
+        let max = 0, p = 0;
+        for (let i = 0; i < 10; i++) {
+            if (probs[i] > max) { max = probs[i]; p = i; }
         }
 
-        document.getElementById('pred').innerHTML = p;
+        document.getElementById('pred').textContent = p;
         
-        var html = '';
-        for(var i = 0; i < 10; i++) {
-            html += '<div class="confidence-item"><span class="digit">'+i+'</span><div class="bar-container"><div class="bar" style="width:'+(probs[i]*100)+'%"></div></div><span class="percentage">'+(probs[i]*100).toFixed(1)+'%</span></div>';
+        let html = '';
+        for (let i = 0; i < 10; i++) {
+            const pct = probs[i] * 100;
+            html += `<div class="bar-row">
+                <span class="bar-digit">${i}</span>
+                <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+                <span class="bar-pct">${pct.toFixed(0)}%</span>
+            </div>`;
         }
-        document.getElementById('conf').innerHTML = html;
+        document.getElementById('bars').innerHTML = html;
     }
     </script>
 </body>
