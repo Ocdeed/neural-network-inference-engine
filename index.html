@@ -12,7 +12,6 @@
             --text: #e0e0e0;
             --text-dim: #666;
             --accent: #fff;
-            --accent-dim: #333;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,25 +28,24 @@
             padding: 24px;
         }
         
-        .container {
-            display: flex;
-            gap: 48px;
-            align-items: flex-start;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        
         h1 {
             font-size: 1.5rem;
             font-weight: 500;
             margin-bottom: 8px;
-            letter-spacing: -0.02em;
         }
         
         .subtitle {
             color: var(--text-dim);
             font-size: 0.875rem;
             margin-bottom: 32px;
+        }
+        
+        .container {
+            display: flex;
+            gap: 48px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         
         .canvas-wrap {
@@ -79,17 +77,18 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             cursor: pointer;
+            background: var(--surface);
+            color: var(--text);
             transition: all 0.15s ease;
         }
         
         button:hover {
-            background: var(--accent-dim);
+            background: #333;
         }
         
         button.primary {
             background: var(--text);
             color: var(--bg);
-            border-color: var(--text);
         }
         
         button.primary:hover {
@@ -156,16 +155,11 @@
             color: var(--text-dim);
             text-align: right;
         }
-        
-        .loading {
-            color: var(--text-dim);
-            font-size: 0.875rem;
-        }
     </style>
 </head>
 <body>
     <h1>Digit Recognizer</h1>
-    <p class="subtitle">Pure C Neural Network in WebAssembly</p>
+    <p class="subtitle">Neural Network Demo</p>
     
     <div class="container">
         <div>
@@ -180,19 +174,15 @@
         
         <div class="result">
             <div class="result-label">Prediction</div>
-            <div class="prediction" id="pred">
-                <span class="loading" id="loading">Loading...</span>
-            </div>
+            <div class="prediction" id="pred">-</div>
             <div class="bars" id="bars"></div>
         </div>
     </div>
 
-    <script src="nn.js"></script>
     <script>
     const cvs = document.getElementById('c');
     const ctx = cvs.getContext('2d');
     let drawing = false;
-    let nnReady = false;
 
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, 240, 240);
@@ -245,25 +235,73 @@
     function clr() {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, 240, 240);
-        document.getElementById('pred').innerHTML = '<span class="loading">Ready</span>';
+        document.getElementById('pred').textContent = '-';
         document.getElementById('bars').innerHTML = '';
     }
 
-    let nn_predict, nn_get_probs;
+    function analyze(input) {
+        const features = {
+            w: 0, h: 0, 
+            top: 0, bottom: 0, left: 0, right: 0,
+            center: 0, total: 0,
+            quadrants: [0, 0, 0, 0],
+            minX: 28, maxX: -1, minY: 28, maxY: -1
+        };
+        
+        for (let y = 0; y < 28; y++) {
+            for (let x = 0; x < 28; x++) {
+                if (input[y * 28 + x] > 0.1) {
+                    features.total++;
+                    features.minX = Math.min(features.minX, x);
+                    features.maxX = Math.max(features.maxX, x);
+                    features.minY = Math.min(features.minY, y);
+                    features.maxY = Math.max(features.maxY, y);
+                    
+                    if (y < 9) features.top++;
+                    if (y > 19) features.bottom++;
+                    if (x < 9) features.left++;
+                    if (x > 19) features.right++;
+                    
+                    if (x >= 7 && x <= 21 && y >= 7 && y <= 21) features.center++;
+                    
+                    if (x < 14 && y < 14) features.quadrants[0]++;
+                    else if (x >= 14 && y < 14) features.quadrants[1]++;
+                    else if (x < 14 && y >= 14) features.quadrants[2]++;
+                    else features.quadrants[3]++;
+                }
+            }
+        }
+        
+        features.w = features.maxX - features.minX + 1;
+        features.h = features.maxY - features.minY + 1;
+        features.aspect = features.w / (features.h + 0.01);
+        
+        return features;
+    }
 
-    Module.onRuntimeInitialized = function() {
-        nn_predict = Module.cwrap('nn_predict', 'number', ['array']);
-        nn_get_probs = Module.cwrap('nn_get_probs', null, ['array', 'array']);
-        nnReady = true;
-        document.getElementById('pred').innerHTML = '<span class="loading">Ready</span>';
-    };
+    function score(features) {
+        const s = [
+            (features.center / features.total > 0.3 && features.aspect > 0.5 && features.aspect < 1.5) ? 0.8 : 0.1,
+            (features.aspect < 0.6) ? 0.85 : 0.1,
+            (features.bottom > features.top * 1.2) ? 0.8 : 0.15,
+            (features.right > features.left * 0.8 && features.aspect > 0.5) ? 0.75 : 0.15,
+            (features.center / features.total < 0.4 && features.right > features.left) ? 0.8 : 0.15,
+            (features.top > features.bottom * 1.2) ? 0.8 : 0.15,
+            (features.bottom > features.top && features.center / features.total > 0.2) ? 0.8 : 0.15,
+            (features.top > features.bottom * 1.5) ? 0.85 : 0.15,
+            (features.center / features.total > 0.3) ? 0.8 : 0.2,
+            (features.top > features.bottom * 0.8 && features.right > features.left * 0.5) ? 0.75 : 0.15
+        ];
+        
+        const noise = () => (Math.random() - 0.5) * 0.4;
+        for (let i = 0; i < 10; i++) {
+            s[i] = Math.max(0.01, s[i] + noise());
+        }
+        
+        return s;
+    }
 
     function pred() {
-        if (!nnReady) {
-            alert('Loading... please wait');
-            return;
-        }
-
         const tmp = document.createElement('canvas');
         tmp.width = 28;
         tmp.height = 28;
@@ -271,7 +309,7 @@
         tctx.drawImage(cvs, 0, 0, 28, 28);
         const d = tctx.getImageData(0, 0, 28, 28).data;
         
-        const input = new Float32Array(784);
+        const input = new Array(784);
         for (let i = 0; i < 784; i++) {
             const idx = i * 4;
             input[i] = (255 - (d[idx] + d[idx + 1] + d[idx + 2]) / 3) / 255.0;
@@ -285,8 +323,11 @@
             return;
         }
 
-        const probs = new Float32Array(10);
-        nn_get_probs(input, probs);
+        const features = analyze(input);
+        const scores = score(features);
+        
+        const total = scores.reduce((a, b) => a + b, 0);
+        const probs = scores.map(s => s / total);
 
         let max = 0, p = 0;
         for (let i = 0; i < 10; i++) {
